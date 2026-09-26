@@ -74,6 +74,8 @@ cmake --build --preset linux-amd64-release
 
 ### Windows
 
+Packaged Windows builds automatically use a `game` directory beside the executable when no `--game_data_root` argument is supplied.
+
 Use an LLVM/Clang 20+ developer shell:
 
 ```powershell
