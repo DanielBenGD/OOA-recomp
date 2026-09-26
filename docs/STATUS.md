@@ -11,7 +11,7 @@
 | Image size | `0x00B20000` |
 | Entry point | `0x8227E3D8` |
 | Code range | `0x820E0000–0x824C9ED4` |
-| Recompiled functions | `10,841` |
+| Recompiled functions | `10,842` |
 | Unsupported emitted opcodes | `0` |
 
 ## Verified
@@ -21,7 +21,7 @@
 - Runtime creates a Vulkan device and swapchain.
 - Runtime mounts the user-supplied game directory and loads `game:\\default.xex`.
 - Runtime patches 79 XAM and 134 Xbox kernel imports.
-- Function dispatcher registers all 10,841 generated functions with zero duplicates or rejects.
+- Function dispatcher registers the generated functions with zero duplicates or rejects.
 - The guest reaches title startup and begins graphics pipeline creation.
 
 ## Not yet verified
@@ -50,3 +50,9 @@ The linker map resolves this to guest function `sub_820EC138` (guest
 renderer-service pointer at guest global `0x8265CC40`. The pointer was null
 during startup. The generated translation now skips that cache entry until the
 service exists, rather than dereferencing guest address zero.
+
+A subsequent run reached the guest dispatcher and reported an unregistered
+indirect target at `0x824786B8`. This was a real six-instruction PPC thunk
+between functions `0x82478698` and `0x824786D0`, not a call to garbage. It is
+now declared in `[entrypoint.functions]` with a bounded size of `0x18` and is
+generated as `sub_824786B8`.
