@@ -1,0 +1,98 @@
+# OutRun Online Arcade — static recompilation
+
+Experimental static recompilation of the Xbox 360 release of **OutRun Online
+Arcade** (Title ID `58410968`) using [ReXGlue](https://github.com/rexglue/rexglue-sdk).
+
+> **Very early bring-up.** The generated PowerPC-to-C++ translation compiles
+> and reaches title startup, but this is not yet a playable port.
+
+## Current status
+
+- ReXGlue SDK: **v0.8.0**
+- XEX image base: `0x82000000`
+- Guest entry point: `0x8227E3D8`
+- Guest code range: `0x820E0000–0x824C9ED4` (`4,103,892` bytes)
+- Generated functions: **10,841**
+- Unsupported PPC opcodes emitted by codegen: **0**
+- Linux x86-64 release build: **passing**
+- Runtime smoke test: XEX loads, all 10,841 functions register, Xbox kernel/XAM
+  imports are patched, Vulkan initializes, and title startup begins.
+- Rendering/gameplay: **not working yet**; the first observed frame is black
+  while the title begins graphics/shader initialization.
+
+See [docs/STATUS.md](docs/STATUS.md) for the bring-up log and next tasks.
+
+## What is not included
+
+This repository contains generated/native source code only. It intentionally
+contains **no XEX, STFS package, ROM, audio, textures, stages, or other original
+game assets**. You must supply your own legally obtained dump.
+
+## Required game files
+
+Place an extracted game directory in `game/`, with `game/default.xex` at its
+root. The expected executable hash is documented in [game/README.md](game/README.md).
+
+## Regenerate the C++ translation
+
+Install ReXGlue v0.8.0 and put `rexglue` on `PATH`, then run:
+
+```bash
+python3 scripts/check_dump.py
+rexglue codegen outrun_online_arcade_recomp_manifest.toml
+```
+
+The generated source is intentionally committed so contributors can inspect
+and build the project without redistributing the game executable.
+
+## Build
+
+Requirements:
+
+- ReXGlue SDK v0.8.0, either installed or supplied as a source tree
+- CMake 3.25+
+- Ninja
+- Clang 20+
+- Vulkan development/runtime files on Linux
+
+### Linux
+
+With an installed SDK:
+
+```bash
+cmake --preset linux-amd64-release -DCMAKE_PREFIX_PATH=/path/to/rexglue-sdk
+cmake --build --preset linux-amd64-release
+```
+
+Or with an SDK source checkout:
+
+```bash
+cmake --preset linux-amd64-release -DREXSDK_DIR=/path/to/rexglue-sdk
+cmake --build --preset linux-amd64-release
+```
+
+### Windows
+
+Use an LLVM/Clang 20+ developer shell:
+
+```powershell
+cmake --preset win-amd64-release -DREXSDK_DIR=C:\path\to\rexglue-sdk
+cmake --build --preset win-amd64-release
+```
+
+## Run
+
+```bash
+./out/build/linux-amd64-release/outrun_online_arcade_recomp \
+  --game_data_root="$PWD/game"
+```
+
+## Project policy
+
+- Do not upload original game files, decrypted assets, or package contents.
+- Do not request or provide download links for copyrighted game data.
+- Keep generated code tied to the documented executable hash.
+- Prefer small, reproducible fixes with runtime logs and clear addresses.
+
+This is an independent preservation/research project. It is not affiliated
+with Sega, Microsoft, Sumo Digital, or ReXGlue.

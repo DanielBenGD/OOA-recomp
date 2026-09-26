@@ -1,0 +1,20 @@
+# User-supplied game dump. Never commit copyrighted game files.
+game/*
+!game/README.md
+
+# Build output
+out/
+build/
+cmake-build-*/
+
+# Runtime state and logs
+*.log
+*.toml.user
+user/
+cache/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
