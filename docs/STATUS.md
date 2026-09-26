@@ -96,4 +96,7 @@ The exact linker timestamp and map place the fault in `sub_820EE1A8`, at guest
 `0x820EE328` (`lwz r11,12(r11)`), while dispatching an optional resource
 provider through the object passed in `r26`. The generated translation now
 returns a null resource when that provider object is null instead of reading a
-vtable from guest address zero.
+vtable from guest address zero. The next run exposed the downstream assumption:
+`0xC0000005` at new host RVA `0xBC41A5`, guest `sub_8228C318` / `0x8228C328`,
+reading range metadata at `resource + 876`. The range helper now treats a null
+resource as an empty range rather than dereferencing it.

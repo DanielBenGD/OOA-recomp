@@ -40819,6 +40819,15 @@ DEFINE_REX_FUNC(sub_8228C318) {
 	ea = -128 + ctx.r1.u32;
 	REX_STORE_U32(ea, ctx.r1.u32);
 	ctx.r1.u32 = ea;
+	// A missing optional race resource may reach this range-query helper after
+	// the provider lookup returned null. Report an empty range rather than
+	// dereferencing guest address 0 + 876.
+	if (ctx.r3.u32 == 0) {
+		if (ctx.r5.u32 != 0) {
+			REX_STORE_U32(ctx.r5.u32, 0);
+		}
+		goto loc_8228C368;
+	}
 	// lwz r29,876(r3)
 	ctx.r29.u64 = REX_LOAD_U32(ctx.r3.u32 + 876);
 	// mr r31,r3
