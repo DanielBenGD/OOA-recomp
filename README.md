@@ -103,6 +103,23 @@ cmake --build --preset win-amd64-release
   --game_data_root="$PWD/game"
 ```
 
+## Keyboard controls
+
+Keyboard controller emulation is enabled by default. The initial bindings are:
+
+- Arrow keys: menu/D-pad
+- `WASD`: left stick / steering
+- `Space`: A / accelerate
+- `Shift`: B / brake
+- `R`: X
+- `E`: Y
+- `Esc`: Start
+- `Tab`: Back
+- Left/right mouse buttons: right/left trigger
+
+Bindings can be changed in ReXGlue's Input settings or through the corresponding
+`keybind_*` options. Pass `--mnk_mode=false` to disable keyboard emulation.
+
 ## Project policy
 
 - Do not upload original game files, decrypted assets, or package contents.

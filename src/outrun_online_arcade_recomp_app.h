@@ -6,6 +6,7 @@
 
 #include <rex/rex_app.h>
 #include <rex/filesystem.h>
+#include <rex/cvar.h>
 
 class OutrunOnlineArcadeRecompApp : public rex::ReXApp {
  public:
@@ -25,9 +26,17 @@ class OutrunOnlineArcadeRecompApp : public rex::ReXApp {
     }
   }
 
+  // Enable ReXGlue's keyboard/mouse-to-Xbox-controller bridge by default.
+  // An explicit CLI/config choice still wins.
+  void OnPreSetup(rex::RuntimeConfig& config) override {
+    (void)config;
+    if (!rex::cvar::HasNonDefaultValue("mnk_mode")) {
+      rex::cvar::SetFlagByName("mnk_mode", "true");
+    }
+  }
+
   // Override virtual hooks for customization:
   // void OnPostInitLogging() override {}
-  // void OnPreSetup(rex::RuntimeConfig& config) override {}
   // void OnLoadXexImage(std::string& xex_image) override {}
   // void OnPostSetup() override {}
   // void OnCreateDialogs(rex::ui::ImGuiDrawer* drawer) override {}
