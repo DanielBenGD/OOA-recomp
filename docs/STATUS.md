@@ -17,7 +17,7 @@
 ## Verified
 
 - ReXGlue code generation completes without unresolved-call or unsupported-opcode errors.
-- The generated project compiles and links on Linux x86-64 in Release mode.
+- The generated project compiles and links on Linux and Windows x86-64 in Release mode.
 - Runtime creates a Vulkan device and swapchain.
 - Runtime mounts the user-supplied game directory and loads `game:\\default.xex`.
 - Runtime patches 79 XAM and 134 Xbox kernel imports.
@@ -31,7 +31,7 @@
 - Audio output
 - Save/profile behavior
 - Race gameplay
-- Windows build and runtime
+- Windows runtime on physical hardware
 - Deterministic behavior against original hardware
 
 ## Next work

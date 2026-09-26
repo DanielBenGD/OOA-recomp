@@ -16,6 +16,10 @@ set(OUTRUNONLINEARCADERECOMP_SOURCES
 )
 
 if(WIN32)
+    list(APPEND OUTRUNONLINEARCADERECOMP_SOURCES src/win_compat.cpp)
+endif()
+
+if(WIN32)
     add_executable(outrun_online_arcade_recomp WIN32 ${OUTRUNONLINEARCADERECOMP_SOURCES})
 else()
     add_executable(outrun_online_arcade_recomp ${OUTRUNONLINEARCADERECOMP_SOURCES})
