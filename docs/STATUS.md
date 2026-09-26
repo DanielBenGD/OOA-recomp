@@ -41,3 +41,12 @@
 3. Validate shader translation and render-target behavior.
 4. Bring up controller input and the original menu.
 5. Add reproducible smoke tests and a compatibility matrix.
+
+## Windows startup crash workaround
+
+A Windows 10 / AMD Vega 8 test reported `0xC0000005` at host RVA `0x4D570`.
+The linker map resolves this to guest function `sub_820EC138` (guest
+`0x820EC138`), specifically the translated `lwz r11,0(r3)` after reading the
+renderer-service pointer at guest global `0x8265CC40`. The pointer was null
+during startup. The generated translation now skips that cache entry until the
+service exists, rather than dereferencing guest address zero.

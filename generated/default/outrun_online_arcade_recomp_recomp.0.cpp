@@ -29311,38 +29311,46 @@ loc_820EC2E8:
 	sub_824AED48(ctx, base);
 	// lwz r3,0(r28)
 	ctx.r3.u64 = REX_LOAD_U32(ctx.r28.u32 + 0);
-	// lwz r11,0(r3)
-	ctx.r11.u64 = REX_LOAD_U32(ctx.r3.u32 + 0);
-	// lwz r11,12(r11)
-	ctx.r11.u64 = REX_LOAD_U32(ctx.r11.u32 + 12);
-	// mtctr r11
-	ctx.ctr.u64 = ctx.r11.u64;
-	// bctrl 
-	ctx.lr = 0x820EC304;
-	REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
-	// bl 0x8228c558
-	ctx.lr = 0x820EC308;
-	sub_8228C558(ctx, base);
+	// OOA bring-up: this renderer-service pointer is temporarily null during
+	// Windows startup. The original code assumes static initialization has
+	// completed and immediately dereferences it. Skip this cache entry until
+	// the service exists instead of crashing in the translated host load.
+	if (ctx.r3.u32 != 0) {
+		// lwz r11,0(r3)
+		ctx.r11.u64 = REX_LOAD_U32(ctx.r3.u32 + 0);
+		// lwz r11,12(r11)
+		ctx.r11.u64 = REX_LOAD_U32(ctx.r11.u32 + 12);
+		// mtctr r11
+		ctx.ctr.u64 = ctx.r11.u64;
+		// bctrl
+		ctx.lr = 0x820EC304;
+		REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+		// bl 0x8228c558
+		ctx.lr = 0x820EC308;
+		sub_8228C558(ctx, base);
+		// stwx r3,r19,r25
+		REX_STORE_U32(ctx.r19.u32 + ctx.r25.u32, ctx.r3.u32);
+	}
 	// lwz r11,0(r27)
 	ctx.r11.u64 = REX_LOAD_U32(ctx.r27.u32 + 0);
-	// stwx r3,r19,r25
-	REX_STORE_U32(ctx.r19.u32 + ctx.r25.u32, ctx.r3.u32);
-	// mr r3,r11
-	ctx.r3.u64 = ctx.r11.u64;
-	// lwz r11,0(r11)
-	ctx.r11.u64 = REX_LOAD_U32(ctx.r11.u32 + 0);
-	// lwz r11,12(r11)
-	ctx.r11.u64 = REX_LOAD_U32(ctx.r11.u32 + 12);
-	// mtctr r11
-	ctx.ctr.u64 = ctx.r11.u64;
-	// bctrl 
-	ctx.lr = 0x820EC324;
-	REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
-	// bl 0x8228c370
-	ctx.lr = 0x820EC328;
-	sub_8228C370(ctx, base);
-	// stwx r3,r19,r26
-	REX_STORE_U32(ctx.r19.u32 + ctx.r26.u32, ctx.r3.u32);
+	if (ctx.r11.u32 != 0) {
+		// mr r3,r11
+		ctx.r3.u64 = ctx.r11.u64;
+		// lwz r11,0(r11)
+		ctx.r11.u64 = REX_LOAD_U32(ctx.r11.u32 + 0);
+		// lwz r11,12(r11)
+		ctx.r11.u64 = REX_LOAD_U32(ctx.r11.u32 + 12);
+		// mtctr r11
+		ctx.ctr.u64 = ctx.r11.u64;
+		// bctrl
+		ctx.lr = 0x820EC324;
+		REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+		// bl 0x8228c370
+		ctx.lr = 0x820EC328;
+		sub_8228C370(ctx, base);
+		// stwx r3,r19,r26
+		REX_STORE_U32(ctx.r19.u32 + ctx.r26.u32, ctx.r3.u32);
+	}
 loc_820EC32C:
 	// addi r19,r19,4
 	ctx.r19.s64 = ctx.r19.s64 + 4;
