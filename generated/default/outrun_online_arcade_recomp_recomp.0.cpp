@@ -46545,6 +46545,9 @@ loc_820F336C:
 	sub_822AAA28(ctx, base);
 	// lwz r3,112(r1)
 	ctx.r3.u64 = REX_LOAD_U32(ctx.r1.u32 + 112);
+	// The factory may still fail when neither retail nor development project
+	// data exists. Skip only the two optional interface calls in that case.
+	if (ctx.r3.u32 == 0) goto loc_820F340C;
 	// lwz r11,0(r3)
 	ctx.r11.u64 = REX_LOAD_U32(ctx.r3.u32 + 0);
 	// lwz r11,12(r11)
@@ -46574,6 +46577,7 @@ loc_820F336C:
 	// bctrl 
 	ctx.lr = 0x820F340C;
 	REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+loc_820F340C:
 	// lis r11,-32167
 	ctx.r11.s64 = -2108096512;
 	// addi r3,r11,-3880

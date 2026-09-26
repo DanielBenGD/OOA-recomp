@@ -23,23 +23,26 @@
 - Runtime patches 79 XAM and 134 Xbox kernel imports.
 - Function dispatcher registers the generated functions with zero duplicates or rejects.
 - The guest reaches title startup and begins graphics pipeline creation.
+- Windows 10 on AMD Vega 8 reaches and presents an original title/menu frame.
+- The retail `.gpu` to `.gpz` project fallback loads `NewMM.gpz` and
+  `NewMM_EN.gpz` from the user-supplied dump.
 
 ## Not yet verified
 
-- Correct visible rendering
+- Correct textures and persistent visible rendering
 - Menu input
 - Audio output
 - Save/profile behavior
 - Race gameplay
-- Windows runtime on physical hardware
 - Deterministic behavior against original hardware
 
 ## Next work
 
-1. Capture a longer trace on a real Vulkan GPU and identify the first title stall.
-2. Add per-title XAM/kernel shims only where traces prove they are needed.
-3. Validate shader translation and render-target behavior.
-4. Bring up controller input and the original menu.
+1. Trace the writes to vertex fetch constant 0 before the first rejected draw.
+2. Correct the fetch-constant or GPU address conversion without bypassing
+   backend validation.
+3. Validate texture tiling, endian conversion, pitch, and render-target behavior.
+4. Bring up controller input and persistent original-menu rendering.
 5. Add reproducible smoke tests and a compatibility matrix.
 
 ## Windows startup crash workaround
@@ -62,3 +65,20 @@ The next runtime trace reached another valid unregistered indirect target at
 `sub_82193BE0` and `sub_82193C00`; it loads guest address `0x825A5CE0` and
 tail-calls `sub_8219FB08`. The bounded `0x10` function is now generated as
 `sub_82193BF0`.
+
+## First rendered frame
+
+ReXGlue v0.8.0's `NtAllocateVirtualMemory_entry` used the guest pointer address
+as `RegionSize` instead of reading the value stored at that pointer. The local
+runtime patch corrects the allocation size. It also retries missing retail
+project paths from `.gpu` to `.gpz`, matching the layout of the extracted XBLA
+package. A null guard in `sub_820F3148` prevents an optional missing project
+from dereferencing guest address zero.
+
+With those changes, the Windows D3D12 build presents an original title/menu
+frame for the first time. The frame has corrupted textures and later becomes
+black. A 3.1 MB trace contains no fatal CPU/runtime error, but records 10,907
+rejected draws. Every rejection reports vertex fetch constant 0 as either
+`8A004802 160E8086` or `8A004802 16480086`, followed by
+`PM4_DRAW_INDX(4, 6, 2): Failed in backend`. This is the current graphics
+blocker; forcing those descriptors through validation would be unsafe.

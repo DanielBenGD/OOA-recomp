@@ -17,9 +17,11 @@ Arcade** (Title ID `58410968`) using [ReXGlue](https://github.com/rexglue/rexglu
 - Linux x86-64 release build: **passing**
 - Windows x86-64 release build: **passing**
 - Runtime smoke test: XEX loads, all 10,843 functions register, Xbox kernel/XAM
-  imports are patched, Vulkan initializes, and title startup begins.
-- Rendering/gameplay: **not working yet**; the first observed frame is black
-  while the title begins graphics/shader initialization.
+  imports are patched, and title startup completes on Windows 10 / AMD Vega 8.
+- Rendering: **first original title/menu frame reached**. Geometry and original
+  assets are visible, but textures are corrupted and later frames return to
+  black because vertex fetch constant 0 is rejected by the D3D12 backend.
+- Gameplay: **not working yet**.
 
 See [docs/STATUS.md](docs/STATUS.md) for the bring-up log and next tasks.
 
@@ -50,7 +52,9 @@ and build the project without redistributing the game executable.
 
 Requirements:
 
-- ReXGlue SDK v0.8.0, either installed or supplied as a source tree
+- ReXGlue SDK v0.8.0 with
+  `patches/rexglue-v0.8.0-ooa-runtime.patch` applied, either installed or
+  supplied as a source tree
 - CMake 3.25+
 - Ninja
 - Clang 20+
