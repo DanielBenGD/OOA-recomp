@@ -11,4 +11,5 @@ out_directory_path = "generated/default"
 includes = []
 
 [entrypoint.functions]
+"0x82193BF0" = { size = 0x10 } # Runtime-discovered indirect-call thunk ending before 0x82193C00.
 "0x824786B8" = { size = 0x18 } # Tiny indirect-call thunk ending before 0x824786D0.

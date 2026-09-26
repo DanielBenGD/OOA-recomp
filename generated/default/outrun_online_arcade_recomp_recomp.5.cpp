@@ -68938,6 +68938,17 @@ DEFINE_REX_FUNC(sub_82193BE0) {
 	return;
 }
 
+DEFINE_REX_FUNC(sub_82193BF0) {
+	REX_FUNC_PROLOGUE();
+	// lis r11,-32166
+	ctx.r11.s64 = -2108030976;
+	// addi r3,r11,23776
+	ctx.r3.s64 = ctx.r11.s64 + 23776;
+	// b 0x8219fb08
+	sub_8219FB08(ctx, base);
+	return;
+}
+
 DEFINE_REX_FUNC(sub_82193C00) {
 	REX_FUNC_PROLOGUE();
 	PPCRegister temp{};

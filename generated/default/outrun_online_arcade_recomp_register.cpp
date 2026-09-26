@@ -1966,6 +1966,7 @@ void outrun_online_arcade_recomp_RegisterFunctions(rex::runtime::IModuleRegistra
   registrar->SetFunction(0x82193A60, sub_82193A60);
   registrar->SetFunction(0x82193B00, sub_82193B00);
   registrar->SetFunction(0x82193BE0, sub_82193BE0);
+  registrar->SetFunction(0x82193BF0, sub_82193BF0);
   registrar->SetFunction(0x82193C00, sub_82193C00);
   registrar->SetFunction(0x82195BB0, sub_82195BB0);
   registrar->SetFunction(0x82195BD0, sub_82195BD0);

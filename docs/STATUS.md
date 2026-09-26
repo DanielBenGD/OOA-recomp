@@ -11,7 +11,7 @@
 | Image size | `0x00B20000` |
 | Entry point | `0x8227E3D8` |
 | Code range | `0x820E0000–0x824C9ED4` |
-| Recompiled functions | `10,842` |
+| Recompiled functions | `10,843` |
 | Unsupported emitted opcodes | `0` |
 
 ## Verified
@@ -56,3 +56,9 @@ indirect target at `0x824786B8`. This was a real six-instruction PPC thunk
 between functions `0x82478698` and `0x824786D0`, not a call to garbage. It is
 now declared in `[entrypoint.functions]` with a bounded size of `0x18` and is
 generated as `sub_824786B8`.
+
+The next runtime trace reached another valid unregistered indirect target at
+`0x82193BF0`. Its bytes decode to a four-instruction tail-call thunk between
+`sub_82193BE0` and `sub_82193C00`; it loads guest address `0x825A5CE0` and
+tail-calls `sub_8219FB08`. The bounded `0x10` function is now generated as
+`sub_82193BF0`.

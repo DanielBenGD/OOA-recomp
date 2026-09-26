@@ -12,11 +12,11 @@ Arcade** (Title ID `58410968`) using [ReXGlue](https://github.com/rexglue/rexglu
 - XEX image base: `0x82000000`
 - Guest entry point: `0x8227E3D8`
 - Guest code range: `0x820E0000–0x824C9ED4` (`4,103,892` bytes)
-- Generated functions: **10,842**
+- Generated functions: **10,843**
 - Unsupported PPC opcodes emitted by codegen: **0**
 - Linux x86-64 release build: **passing**
 - Windows x86-64 release build: **passing**
-- Runtime smoke test: XEX loads, all 10,842 functions register, Xbox kernel/XAM
+- Runtime smoke test: XEX loads, all 10,843 functions register, Xbox kernel/XAM
   imports are patched, Vulkan initializes, and title startup begins.
 - Rendering/gameplay: **not working yet**; the first observed frame is black
   while the title begins graphics/shader initialization.
