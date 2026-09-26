@@ -18,3 +18,5 @@ cache/
 .idea/
 .DS_Store
 Thumbs.db
+game/**/*.gpu
+game/**/*.gpz

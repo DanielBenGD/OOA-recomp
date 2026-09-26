@@ -18,9 +18,10 @@ Arcade** (Title ID `58410968`) using [ReXGlue](https://github.com/rexglue/rexglu
 - Windows x86-64 release build: **passing**
 - Runtime smoke test: XEX loads, all 10,843 functions register, Xbox kernel/XAM
   imports are patched, and title startup completes on Windows 10 / AMD Vega 8.
-- Rendering: **first original title/menu frame reached**. Geometry and original
-  assets are visible, but textures are corrupted and later frames return to
-  black because vertex fetch constant 0 is rejected by the D3D12 backend.
+- Rendering: **first original title/menu frame reached**. The previous corrupt
+  textures and rejected draws were traced to retail zlib-compressed `.gpz`
+  projects being exposed to the guest as raw `.gpu` data. Dump preparation now
+  materializes the expected unpacked `.gpu` siblings; Windows validation is pending.
 - Gameplay: **not working yet**.
 
 See [docs/STATUS.md](docs/STATUS.md) for the bring-up log and next tasks.
@@ -35,6 +36,14 @@ game assets**. You must supply your own legally obtained dump.
 
 Place an extracted game directory in `game/`, with `game/default.xex` at its
 root. The expected executable hash is documented in [game/README.md](game/README.md).
+Then prepare the retail compressed GPU projects:
+
+```bash
+python3 scripts/prepare_game.py game
+```
+
+This creates local `.gpu` files beside the dump's `.gpz` files. They remain
+untracked and must never be committed or redistributed.
 
 ## Regenerate the C++ translation
 

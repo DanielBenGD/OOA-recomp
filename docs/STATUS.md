@@ -24,8 +24,8 @@
 - Function dispatcher registers the generated functions with zero duplicates or rejects.
 - The guest reaches title startup and begins graphics pipeline creation.
 - Windows 10 on AMD Vega 8 reaches and presents an original title/menu frame.
-- The retail `.gpu` to `.gpz` project fallback loads `NewMM.gpz` and
-  `NewMM_EN.gpz` from the user-supplied dump.
+- The dump-preparation tool inflates retail zlib `.gpz` projects into the `.gpu`
+  files expected by the guest filesystem.
 
 ## Not yet verified
 
@@ -38,9 +38,8 @@
 
 ## Next work
 
-1. Trace the writes to vertex fetch constant 0 before the first rejected draw.
-2. Correct the fetch-constant or GPU address conversion without bypassing
-   backend validation.
+1. Validate the unpacked `.gpu` preparation on Windows D3D12 with a fresh cache.
+2. Confirm the invalid vertex-fetch and corrupted-texture errors are gone.
 3. Validate texture tiling, endian conversion, pitch, and render-target behavior.
 4. Bring up controller input and persistent original-menu rendering.
 5. Add reproducible smoke tests and a compatibility matrix.
@@ -70,10 +69,16 @@ tail-calls `sub_8219FB08`. The bounded `0x10` function is now generated as
 
 ReXGlue v0.8.0's `NtAllocateVirtualMemory_entry` used the guest pointer address
 as `RegionSize` instead of reading the value stored at that pointer. The local
-runtime patch corrects the allocation size. It also retries missing retail
-project paths from `.gpu` to `.gpz`, matching the layout of the extracted XBLA
-package. A null guard in `sub_820F3148` prevents an optional missing project
-from dereferencing guest address zero.
+runtime patch corrects the allocation size. A null guard in `sub_820F3148`
+prevents an optional missing project from dereferencing guest address zero.
+
+The first rendering workaround incorrectly opened retail `.gpz` files when the
+guest requested `.gpu`. The `.gpz` files are zlib streams (for example,
+`NewMM.gpz` expands from 1,379,777 to 6,291,460 bytes), so this fed compressed
+bytes to the menu renderer as GPU project data. That explains both the corrupted
+first frame and the nonsensical vertex descriptors. `scripts/prepare_game.py`
+now inflates each user-supplied `.gpz` beside the dump as `.gpu`; the unsafe VFS
+fallback has been removed from the runtime patch.
 
 With those changes, the Windows D3D12 build presents an original title/menu
 frame for the first time. The frame has corrupted textures and later becomes
