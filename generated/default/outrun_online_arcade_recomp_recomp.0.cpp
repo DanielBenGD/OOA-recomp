@@ -34206,6 +34206,14 @@ loc_820EE2F8:
 	// b 0x820ee374
 	goto loc_820EE374;
 loc_820EE324:
+	// Race loading may request an optional resource provider with a null object.
+	// The original environment tolerates the missing provider; avoid reading a
+	// vtable from guest address zero and preserve a null resource result.
+	if (ctx.r26.u32 == 0) {
+		ctx.r3.u64 = 0;
+		REX_STORE_U32(ctx.r31.u32 + 12, ctx.r3.u32);
+		goto loc_820EE340;
+	}
 	// lwz r11,0(r26)
 	ctx.r11.u64 = REX_LOAD_U32(ctx.r26.u32 + 0);
 	// mr r3,r26

@@ -87,3 +87,13 @@ rejected draws. Every rejection reports vertex fetch constant 0 as either
 `8A004802 160E8086` or `8A004802 16480086`, followed by
 `PM4_DRAW_INDX(4, 6, 2): Failed in backend`. This is the current graphics
 blocker; forcing those descriptors through validation would be unsafe.
+
+## Interactive menu and race-load crash
+
+Keyboard controller emulation reaches and controls the original menu. Entering
+a race on Windows 10 initially crashed with `0xC0000005` at host RVA `0x5F180`.
+The exact linker timestamp and map place the fault in `sub_820EE1A8`, at guest
+`0x820EE328` (`lwz r11,12(r11)`), while dispatching an optional resource
+provider through the object passed in `r26`. The generated translation now
+returns a null resource when that provider object is null instead of reading a
+vtable from guest address zero.
