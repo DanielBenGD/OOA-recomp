@@ -41287,6 +41287,18 @@ loc_8228C594:
 	ctx.r10.u64 = ctx.r10.u32 & 0x1;
 	// lwz r29,8(r31)
 	ctx.r29.u64 = REX_LOAD_U32(ctx.r31.u32 + 8);
+	// This project field packs allocation flags into the upper size bits. The
+	// kernel allocator already strips those bits, but the same raw value was
+	// subsequently passed to memcpy, turning an ~8 MiB project copy into a
+	// bogus ~1 GiB copy and causing the whole 3D payload to be discarded.
+	if (ctx.r29.u32 > 0x20000000u && (ctx.r29.u32 & 0xC0000000u)) {
+		const uint32_t packed_project_size = ctx.r29.u32;
+		ctx.r29.u32 &= 0x3FFFFFFFu;
+		REXCPU_WARN(
+			"Normalized packed OutRun project copy size: "
+			"packed={:08X} bytes={:08X}",
+			packed_project_size, ctx.r29.u32);
+	}
 	// add r28,r11,r31
 	ctx.r28.u64 = ctx.r11.u64 + ctx.r31.u64;
 	// subfic r10,r10,0
