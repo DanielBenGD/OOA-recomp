@@ -47367,6 +47367,17 @@ DEFINE_REX_FUNC(sub_824B1FF8) {
 	// b 0x824b2030
 	goto loc_824B2030;
 loc_824B2018:
+	// A damaged callback-table boundary must not turn shutdown or a module
+	// transition into a native access violation. Stop walking this optional
+	// table when the next slot is no longer backed by guest memory.
+	if (!rex_is_guest_range_readable(base, ctx.r31.u32, 4)) {
+		REXCPU_WARN(
+			"Stopped invalid OutRun callback table walk: current={:08X} "
+			"end={:08X}",
+			ctx.r31.u32, ctx.r30.u32);
+		ctx.r31.u64 = ctx.r30.u64;
+		goto loc_824B2030;
+	}
 	// lwz r11,0(r31)
 	ctx.r11.u64 = REX_LOAD_U32(ctx.r31.u32 + 0);
 	// cmplwi cr6,r11,0
@@ -47494,6 +47505,17 @@ loc_824B20F0:
 	ctx.cr6.compare<uint32_t>(ctx.r30.u32, ctx.r28.u32, ctx.xer);
 	// blt cr6,0x824b216c
 	if (ctx.cr6.lt) goto loc_824B216C;
+	// The callback bounds are writable globals and may be overwritten by a
+	// stale streamed-resource pointer. The observed failure placed the next
+	// slot at unallocated guest address 0x41930000. Callback cleanup is
+	// optional here, so abandon the corrupt table instead of dereferencing it.
+	if (!rex_is_guest_range_readable(base, ctx.r30.u32, 4)) {
+		REXCPU_WARN(
+			"Stopped invalid OutRun reverse callback table walk: "
+			"current={:08X} begin={:08X} end={:08X}",
+			ctx.r30.u32, ctx.r28.u32, ctx.r26.u32);
+		goto loc_824B216C;
+	}
 	// lwz r11,0(r30)
 	ctx.r11.u64 = REX_LOAD_U32(ctx.r30.u32 + 0);
 	// cmplwi cr6,r11,0
