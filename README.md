@@ -18,10 +18,13 @@ Arcade** (Title ID `58410968`) using [ReXGlue](https://github.com/rexglue/rexglu
 - Windows x86-64 release build: **passing**
 - Runtime smoke test: XEX loads, all 10,843 functions register, Xbox kernel/XAM
   imports are patched, and title startup completes on Windows 10 / AMD Vega 8.
-- Rendering: **first original title/menu frame reached**. The previous corrupt
-  textures and rejected draws were traced to retail zlib-compressed `.gpz`
-  projects being exposed to the guest as raw `.gpu` data. Dump preparation now
-  materializes the expected unpacked `.gpu` siblings; Windows validation is pending.
+- Rendering: **first original title/menu frame reached**. Dump preparation
+  materializes the retail zlib-compressed `.gpz` projects as the unpacked `.gpu`
+  siblings expected by the guest. The title-specific runtime patch also enables
+  and broadens `gpu_allow_invalid_fetch_constants` so OutRun's inactive reused
+  vertex-fetch slots are skipped rather than interpreted as huge wrapped buffers.
+  A patched Windows
+  x64 build completes successfully; visual validation is pending.
 - Gameplay: **not working yet**.
 
 See [docs/STATUS.md](docs/STATUS.md) for the bring-up log and next tasks.

@@ -33,6 +33,9 @@ class OutrunOnlineArcadeRecompApp : public rex::ReXApp {
     if (!rex::cvar::HasNonDefaultValue("mnk_mode")) {
       rex::cvar::SetFlagByName("mnk_mode", "true");
     }
+    if (!rex::cvar::HasNonDefaultValue("gpu_allow_invalid_fetch_constants")) {
+      rex::cvar::SetFlagByName("gpu_allow_invalid_fetch_constants", "true");
+    }
   }
 
   // Override virtual hooks for customization:
