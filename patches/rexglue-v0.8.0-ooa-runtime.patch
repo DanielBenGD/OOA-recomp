@@ -43,7 +43,7 @@ index a40436e..d9969b6 100644
                        vfetch_index, vfetch_constant.dword_0, vfetch_constant.dword_1);
            return false;
 diff --git a/src/kernel/xboxkrnl/xboxkrnl_memory.cpp b/src/kernel/xboxkrnl/xboxkrnl_memory.cpp
-index 8684eda..c087fd8 100644
+index 8684eda..19a7220 100644
 --- a/src/kernel/xboxkrnl/xboxkrnl_memory.cpp
 +++ b/src/kernel/xboxkrnl/xboxkrnl_memory.cpp
 @@ -126,9 +126,12 @@ u32 NtAllocateVirtualMemory_entry(mapped_u32 base_addr_ptr, mapped_u32 region_si
@@ -62,6 +62,62 @@ index 8684eda..c087fd8 100644
    // Use 64KB allocation granularity when no base address is specified,
    // matching Xbox 360 behavior. With a base address, use the heap's page size.
    adjusted_size = rex::round_up(adjusted_size, adjusted_base ? page_size : 64 * 1024);
+@@ -391,16 +394,47 @@ u32 MmAllocatePhysicalMemoryEx_entry(u32 flags, u32 region_size, u32 protect_bit
+   // for title 545108B4 where min_addr_range comparison fails due to 0x1000 offset.
+   // If needed, set heap_physical_address_offset = 0 when min_addr_range && max_addr_range.
+   // Reference: xenia-canary 81aaf98e0.
+-  uint32_t heap_min_addr = rex::sat_sub(min_addr_range, heap_physical_address_offset);
+-  uint32_t heap_max_addr = rex::sat_sub(max_addr_range, heap_physical_address_offset);
+   uint32_t heap_size = heap->heap_size();
+-  heap_min_addr = heap_base + std::min(heap_min_addr, heap_size - 1);
+-  heap_max_addr = heap_base + std::min(heap_max_addr, heap_size - 1);
++  auto alloc_with_physical_offset = [&](uint32_t physical_offset,
++                                        uint32_t* out_address) {
++    uint32_t heap_min_addr =
++        rex::sat_sub(min_addr_range, physical_offset);
++    uint32_t heap_max_addr =
++        rex::sat_sub(max_addr_range, physical_offset);
++    heap_min_addr =
++        heap_base + std::min(heap_min_addr, heap_size - 1);
++    heap_max_addr =
++        heap_base + std::min(heap_max_addr, heap_size - 1);
++    return heap->AllocRange(heap_min_addr, heap_max_addr, adjusted_size,
++                            adjusted_alignment, allocation_type, protect,
++                            top_down, out_address);
++  };
++
+   uint32_t base_address;
+-  if (!heap->AllocRange(heap_min_addr, heap_max_addr, adjusted_size, adjusted_alignment,
+-                        allocation_type, protect, top_down, &base_address)) {
+-    // Failed - assume no memory available.
+-    return 0;
++  if (!alloc_with_physical_offset(heap_physical_address_offset,
++                                  &base_address)) {
++    // The 4 KiB physical alias begins at physical address 0x1000. Some Xbox
++    // 360 titles, including OutRun Online Arcade, pass ranges relative to the
++    // alias rather than to that physical offset. Xenia Canary exposes the same
++    // compatibility behavior as ignore_offset_for_ranged_allocations.
++    const bool has_explicit_range =
++        min_addr_range != 0 || max_addr_range != 0xFFFFFFFFu;
++    if (!heap_physical_address_offset || !has_explicit_range ||
++        !alloc_with_physical_offset(0, &base_address)) {
++      REXKRNL_ERROR(
++          "MmAllocatePhysicalMemoryEx failed: flags={:#x} size={:#x} "
++          "adjusted_size={:#x} protect={:#x} min={:#x} max={:#x} "
++          "alignment={:#x} adjusted_alignment={:#x} heap={:#x}+{:#x} "
++          "physical_offset={:#x}",
++          flags, region_size, adjusted_size, protect_bits, min_addr_range,
++          max_addr_range, alignment, adjusted_alignment, heap_base, heap_size,
++          heap_physical_address_offset);
++      return 0;
++    }
++    REXKRNL_WARN(
++        "MmAllocatePhysicalMemoryEx recovered ranged allocation by ignoring "
++        "physical alias offset: size={:#x} min={:#x} max={:#x} addr={:#x}",
++        adjusted_size, min_addr_range, max_addr_range, base_address);
+   }
+   REXKRNL_IMPORT_RESULT("MmAllocatePhysicalMemoryEx", "addr={:#x}", base_address);
+ 
 diff --git a/src/kernel/xboxkrnl/xboxkrnl_ob.cpp b/src/kernel/xboxkrnl/xboxkrnl_ob.cpp
 index 5709e6d..0b94c3f 100644
 --- a/src/kernel/xboxkrnl/xboxkrnl_ob.cpp
@@ -73,5 +129,37 @@ index 5709e6d..0b94c3f 100644
 -  if (rex::string::utf8_starts_with(path, u8"\\??\\")) {
 +  if (rex::string::utf8_starts_with(path, "\\??\\")) {
      path = path.substr(4);  // Strip the full qualifier
+   }
+ 
+diff --git a/src/system/xmemory.cpp b/src/system/xmemory.cpp
+index ca7f4e8..3a0325b 100644
+--- a/src/system/xmemory.cpp
++++ b/src/system/xmemory.cpp
+@@ -1162,7 +1162,12 @@ bool BaseHeap::AllocRange(uint32_t low_address, uint32_t high_address, uint32_t
+ 
+   uint32_t available_page_count = high_page_number - low_page_number + 1;
+   if (!page_count || page_count > available_page_count) {
+-    REXSYS_ERROR("BaseHeap::Alloc page count too big for requested range");
++    REXSYS_ERROR(
++        "BaseHeap::Alloc page count too big for requested range: "
++        "heap={:08X}+{:08X} page_size={:X} request={:08X}-{:08X} "
++        "size={:08X} alignment={:08X} pages={} available={}",
++        heap_base_, heap_size_, page_size_, low_address, high_address, size, alignment,
++        page_count, available_page_count);
+     return false;
+   }
+ 
+@@ -1698,7 +1703,12 @@ bool PhysicalHeap::AllocRange(uint32_t low_address, uint32_t high_address, uint3
+   uint32_t parent_address;
+   if (!parent_heap_->AllocRange(parent_low_address, parent_high_address, size, alignment,
+                                 allocation_type, protect, top_down, &parent_address)) {
+-    REXSYS_ERROR("PhysicalHeap::Alloc unable to alloc physical memory in parent heap");
++    REXSYS_ERROR(
++        "PhysicalHeap::AllocRange unable to alloc physical memory in parent heap: "
++        "heap={:08X}+{:08X} request={:08X}-{:08X} parent={:08X}-{:08X} "
++        "size={:08X} alignment={:08X}",
++        heap_base_, heap_size_, low_address, high_address, parent_low_address,
++        parent_high_address, size, alignment);
+     return false;
    }
  
