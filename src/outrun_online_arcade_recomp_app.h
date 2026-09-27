@@ -36,6 +36,13 @@ class OutrunOnlineArcadeRecompApp : public rex::ReXApp {
     if (!rex::cvar::HasNonDefaultValue("gpu_allow_invalid_fetch_constants")) {
       rex::cvar::SetFlagByName("gpu_allow_invalid_fetch_constants", "true");
     }
+    // The legal XBLA package is the full title, but the generic runtime reports
+    // an unlicensed trial by default. OutRun's trial race path is separate and
+    // is known to fail during loading, so default this title to an activated
+    // content license while still allowing an explicit command-line override.
+    if (!rex::cvar::HasNonDefaultValue("license_mask")) {
+      rex::cvar::SetFlagByName("license_mask", "1");
+    }
   }
 
   // Override virtual hooks for customization:

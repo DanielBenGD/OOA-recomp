@@ -124,6 +124,11 @@ Keyboard controller emulation is enabled by default. The initial bindings are:
 Bindings can be changed in ReXGlue's Input settings or through the corresponding
 `keybind_*` options. Pass `--mnk_mode=false` to disable keyboard emulation.
 
+The title defaults `license_mask` to `1` because this project targets a legally
+owned full XBLA package; ReXGlue otherwise reports trial mode and sends OutRun
+through its separate trial-race loading path. Pass `--license_mask=0` only when
+intentionally testing the trial path.
+
 ## Project policy
 
 - Do not upload original game files, decrypted assets, or package contents.
