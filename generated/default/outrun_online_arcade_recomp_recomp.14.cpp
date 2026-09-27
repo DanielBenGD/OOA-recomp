@@ -52907,6 +52907,17 @@ loc_8229143C:
 	// stw r11,10372(r31)
 	REX_STORE_U32(ctx.r31.u32 + 10372, ctx.r11.u32);
 loc_82291480:
+	// Reject a current streamed project whose descriptor table has already
+	// been released. Keeping it installed in the manager causes the render
+	// update below to follow the dangling table repeatedly.
+	if (!rex_is_guest_range_readable(base, ctx.r25.u32, 24)) {
+		REXCPU_WARN(
+			"Dropped invalid OutRun current model project: manager={:08X} "
+			"project={:08X} table={:08X}",
+			ctx.r31.u32, ctx.r30.u32, ctx.r25.u32);
+		REX_STORE_U32(ctx.r31.u32 + 12704, 0);
+		goto loc_82291CAC;
+	}
 	// lwz r11,20(r25)
 	ctx.r11.u64 = REX_LOAD_U32(ctx.r25.u32 + 20);
 	// clrlwi r11,r11,27
@@ -53100,6 +53111,16 @@ loc_82291534:
 	// stw r11,10372(r31)
 	REX_STORE_U32(ctx.r31.u32 + 10372, ctx.r11.u32);
 loc_822915D8:
+	// Both tables are dereferenced immediately below. If either project has
+	// been unloaded, abandon this update rather than reading a freed pointer.
+	if (!rex_is_guest_range_readable(base, ctx.r27.u32, 24) ||
+		!rex_is_guest_range_readable(base, ctx.r25.u32, 24)) {
+		REXCPU_WARN(
+			"Skipped invalid OutRun model table pair: previous={:08X} "
+			"current={:08X}",
+			ctx.r27.u32, ctx.r25.u32);
+		goto loc_82291CAC;
+	}
 	// lis r10,-32164
 	ctx.r10.s64 = -2107899904;
 	// lwz r7,20(r27)
