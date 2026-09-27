@@ -37299,6 +37299,7 @@ loc_8228AB44:
 DEFINE_REX_FUNC(sub_8228AB60) {
 	REX_FUNC_PROLOGUE();
 	uint32_t ea{};
+	const uint32_t ooa_caller_lr = ctx.lr;
 	// mflr r12
 	ctx.r12.u64 = ctx.lr;
 	// bl 0x824b1848
@@ -37417,8 +37418,10 @@ loc_8228ABF8:
 	if (!rex_is_guest_range_readable(base, ctx.r11.u32, 16)) {
 		REXCPU_WARN(
 			"Skipped invalid OutRun model descriptor: manager={:08X} "
-			"project={:08X} descriptor={:08X}",
-			ctx.r30.u32, ctx.r29.u32, ctx.r11.u32);
+			"project={:08X} relative={:08X} descriptor={:08X} caller={:08X}",
+			ctx.r30.u32, ctx.r29.u32, ctx.r10.u32, ctx.r11.u32,
+			ooa_caller_lr);
+		REX_STORE_U32(ctx.r30.u32 + 12704, 0);
 		goto loc_8228AD24;
 	}
 	// ld r10,0(r30)
