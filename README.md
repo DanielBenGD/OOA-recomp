@@ -19,8 +19,9 @@ Arcade** (Title ID `58410968`) using [ReXGlue](https://github.com/rexglue/rexglu
 - Runtime smoke test: XEX loads, all 10,843 functions register, Xbox kernel/XAM
   imports are patched, and title startup completes on Windows 10 / AMD Vega 8.
 - Rendering: **first original title/menu frame reached**. Dump preparation
-  materializes the retail zlib-compressed `.gpz` projects as the unpacked `.gpu`
-  siblings expected by the guest. The title-specific runtime patch also enables
+  materializes the retail zlib-compressed `.gpz` projects as unpacked `.gpu`
+  siblings and removes each stream's big-endian four-byte size prefix, matching
+  the bytes returned by the original transparent decompression layer. The title-specific runtime patch also enables
   and broadens `gpu_allow_invalid_fetch_constants` so OutRun's inactive reused
   vertex-fetch slots are skipped rather than interpreted as huge wrapped buffers.
   A patched Windows

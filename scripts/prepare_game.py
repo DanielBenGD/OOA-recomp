@@ -23,9 +23,23 @@ def inflate_gpz(path: Path, *, force: bool) -> tuple[str, int]:
 
     compressed = path.read_bytes()
     try:
-        payload = zlib.decompress(compressed)
+        inflated = zlib.decompress(compressed)
     except zlib.error as exc:
         raise RuntimeError(f"{path}: invalid zlib GPZ stream: {exc}") from exc
+
+    # The stream expands to a big-endian 32-bit payload length followed by the
+    # GPU data. The original title's transparent decompression layer consumes
+    # this prefix. Exposing it through the host VFS shifts the entire project by
+    # four bytes, producing the horizontal/scanline texture corruption visible
+    # in the menu.
+    if len(inflated) < 4:
+        raise RuntimeError(f"{path}: inflated GPZ stream is missing its size prefix")
+    expected_size = int.from_bytes(inflated[:4], "big")
+    payload = inflated[4:]
+    if expected_size != len(payload):
+        raise RuntimeError(
+            f"{path}: GPZ size prefix says {expected_size} bytes, got {len(payload)}"
+        )
 
     output.parent.mkdir(parents=True, exist_ok=True)
     fd, temporary_name = tempfile.mkstemp(prefix=output.name + ".", dir=output.parent)
