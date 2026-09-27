@@ -18,8 +18,6 @@ import zlib
 
 def inflate_gpz(path: Path, *, force: bool) -> tuple[str, int]:
     output = path.with_suffix(".gpu")
-    if output.exists() and not force:
-        return "exists", output.stat().st_size
 
     compressed = path.read_bytes()
     try:
@@ -41,6 +39,23 @@ def inflate_gpz(path: Path, *, force: bool) -> tuple[str, int]:
             f"{path}: GPZ size prefix says {expected_size} bytes, got {len(payload)}"
         )
 
+    state = "created"
+    if output.exists() and not force:
+        existing = output.read_bytes()
+        if existing == payload:
+            return "exists", len(payload)
+        # Repair files produced by older versions of this script, which wrote
+        # the four-byte decompressed-size prefix into the .gpu file. Those
+        # files can render 2D textures after partial runtime workarounds, but
+        # their shifted model descriptors produce invalid 3D pointers.
+        if existing == inflated:
+            state = "repaired"
+        else:
+            raise RuntimeError(
+                f"{output}: existing GPU project does not match its GPZ payload; "
+                "use --force only if this file should be replaced"
+            )
+
     output.parent.mkdir(parents=True, exist_ok=True)
     fd, temporary_name = tempfile.mkstemp(prefix=output.name + ".", dir=output.parent)
     try:
@@ -52,7 +67,7 @@ def inflate_gpz(path: Path, *, force: bool) -> tuple[str, int]:
     finally:
         if os.path.exists(temporary_name):
             os.unlink(temporary_name)
-    return "created", len(payload)
+    return state, len(payload)
 
 
 def main() -> int:
@@ -69,17 +84,23 @@ def main() -> int:
     if not gpz_files:
         parser.error(f"no .gpz files found below {root}")
 
-    created = skipped = total_bytes = 0
+    created = repaired = skipped = total_bytes = 0
     for gpz in gpz_files:
         state, size = inflate_gpz(gpz, force=args.force)
         total_bytes += size
         if state == "created":
             created += 1
             print(f"created {gpz.with_suffix('.gpu').relative_to(root)} ({size} bytes)")
+        elif state == "repaired":
+            repaired += 1
+            print(f"repaired {gpz.with_suffix('.gpu').relative_to(root)} ({size} bytes)")
         else:
             skipped += 1
 
-    print(f"Prepared {created} GPU project(s); {skipped} already existed; {total_bytes} bytes ready")
+    print(
+        f"Prepared {created} GPU project(s); repaired {repaired}; "
+        f"{skipped} already valid; {total_bytes} bytes ready"
+    )
     return 0
 
 
