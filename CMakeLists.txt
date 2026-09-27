@@ -8,6 +8,10 @@ project(outrun_online_arcade_recomp LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if(MINGW AND (CMAKE_SYSTEM_PROCESSOR MATCHES "^(AMD64|amd64|x86_64)$"))
+    add_compile_options(-mssse3)
+endif()
+
 include(generated/rexglue.cmake)
 
 # Sources

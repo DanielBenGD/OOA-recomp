@@ -37389,6 +37389,34 @@ loc_8228ABF8:
 	ctx.r11.u64 = REX_LOAD_U8(ctx.r30.u32 + 10942);
 	// cmplwi cr6,r29,0
 	ctx.cr6.compare<uint32_t>(ctx.r29.u32, 0, ctx.xer);
+	if (ctx.r29.u32 != 0) {
+		const uint32_t project_header = ctx.r29.u32 + 872;
+		bool valid_project =
+			rex_is_guest_range_readable(base, project_header, 36);
+		uint32_t relative = 0;
+		uint32_t project_table = 0;
+		if (valid_project) {
+			const uint32_t flags = REX_LOAD_U32(project_header);
+			relative = REX_LOAD_U32(
+				project_header + ((flags & 0x20) ? 32 : 24));
+			project_table = project_header + relative;
+			valid_project = relative != 0 &&
+				rex_is_guest_range_readable(base, project_table, 24);
+		}
+		if (!valid_project) {
+			REXCPU_WARN(
+				"Rejected non-project OutRun 3D resource: project={:08X} "
+				"relative={:08X} table={:08X} caller={:08X}",
+				ctx.r29.u32, relative, project_table, ooa_caller_lr);
+			if (ooa_caller_lr == 0x820E3010 &&
+				rex_is_guest_range_readable(base, ctx.r26.u32 + 24, 4) &&
+				REX_LOAD_U32(ctx.r26.u32 + 24) == ctx.r29.u32) {
+				REX_STORE_U32(ctx.r26.u32 + 24, 0);
+			}
+			ctx.r29.u64 = 0;
+			ctx.cr6.compare<uint32_t>(0, 0, ctx.xer);
+		}
+	}
 	// stw r29,12704(r30)
 	REX_STORE_U32(ctx.r30.u32 + 12704, ctx.r29.u32);
 	// clrlwi r11,r11,25
@@ -52914,7 +52942,7 @@ loc_82291480:
 	// been released. Keeping it installed in the manager causes the render
 	// update below to follow the dangling table repeatedly.
 	if (!rex_is_guest_range_readable(base, ctx.r25.u32, 24)) {
-		REXCPU_WARN(
+		REXCPU_DEBUG(
 			"Dropped invalid OutRun current model project: manager={:08X} "
 			"project={:08X} table={:08X}",
 			ctx.r31.u32, ctx.r30.u32, ctx.r25.u32);

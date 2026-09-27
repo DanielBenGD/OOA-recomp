@@ -1,3 +1,180 @@
+diff --git a/include/rex/chrono/chrono.h b/include/rex/chrono/chrono.h
+index 8761cff..80e90a1 100644
+--- a/include/rex/chrono/chrono.h
++++ b/include/rex/chrono/chrono.h
+@@ -116,6 +116,15 @@ using XSystemClock = detail::NtSystemClock<detail::Domain::Guest>;
+ 
+ namespace std::chrono {
+ 
++#if defined(_LIBCPP_VERSION)
++template <typename DestClock, typename SourceClock>
++struct clock_time_conversion;
++template <typename DestClock, typename SourceClock, typename Duration>
++auto clock_cast(const std::chrono::time_point<SourceClock, Duration>& t) {
++  return clock_time_conversion<DestClock, SourceClock>{}(t);
++}
++#endif
++
+ template <>
+ struct clock_time_conversion<::rex::chrono::WinSystemClock, ::rex::chrono::XSystemClock> {
+   using WClock_ = ::rex::chrono::WinSystemClock;
+diff --git a/include/rex/ui/d3d12/d3d12_api.h b/include/rex/ui/d3d12/d3d12_api.h
+index d0e7252..60e9017 100644
+--- a/include/rex/ui/d3d12/d3d12_api.h
++++ b/include/rex/ui/d3d12/d3d12_api.h
+@@ -19,9 +19,19 @@
+ #define NOMINMAX
+ #endif
+ #include <windows.h>
+-#include <ObjBase.h>
++#include <objbase.h>
+ 
++#if __has_include(<DXProgrammableCapture.h>)
+ #include <DXProgrammableCapture.h>
++#else
++struct IDXGraphicsAnalysis : IUnknown {
++  virtual HRESULT STDMETHODCALLTYPE BeginCapture() = 0;
++  virtual HRESULT STDMETHODCALLTYPE EndCapture() = 0;
++};
++inline constexpr GUID kIID_IDXGraphicsAnalysis = {
++    0x9F251514, 0x9D4D, 0x4902,
++    {0x9D, 0x60, 0x18, 0x98, 0x8A, 0xB7, 0xD4, 0xB5}};
++#endif
+ #include <d3d12.h>
+ #include <d3d12sdklayers.h>
+ #include <d3dcompiler.h>
+@@ -32,4 +42,14 @@
+ #include <dxcapi.h>
+ #include "DxbcConverter.h"
+ 
++inline constexpr GUID kIID_IDxbcConverter = {
++    0x5F956ED5, 0x78D1, 0x4B15,
++    {0x82, 0x47, 0xF7, 0x18, 0x76, 0x14, 0xA0, 0x41}};
++inline constexpr GUID kIID_IDxcUtils = {
++    0x4605C4CB, 0x2019, 0x492A,
++    {0xAD, 0xA4, 0x65, 0xF2, 0x0B, 0xB7, 0xD6, 0x7F}};
++inline constexpr GUID kIID_IDxcCompiler = {
++    0x8C210BF3, 0x011F, 0x4422,
++    {0x8D, 0x70, 0x6F, 0x9A, 0xCB, 0x8D, 0xB6, 0x17}};
++
+ // clang-format on
+diff --git a/include/rex/ui/window_win.h b/include/rex/ui/window_win.h
+index 0b0bb85..7a959a4 100644
+--- a/include/rex/ui/window_win.h
++++ b/include/rex/ui/window_win.h
+@@ -25,7 +25,7 @@
+ #include <dxgi.h>
+ #include <windows.h>
+ 
+-#include <ShellScalingApi.h>
++#include <shellscalingapi.h>
+ 
+ namespace rex {
+ namespace ui {
+diff --git a/include/rex/ui/windowed_app_context_win.h b/include/rex/ui/windowed_app_context_win.h
+index 09b20f7..477a102 100644
+--- a/include/rex/ui/windowed_app_context_win.h
++++ b/include/rex/ui/windowed_app_context_win.h
+@@ -24,7 +24,7 @@
+ #include <rex/ui/windowed_app_context.h>
+ 
+ // For per-monitor DPI awareness v1.
+-#include <ShellScalingApi.h>
++#include <shellscalingapi.h>
+ 
+ namespace rex {
+ namespace ui {
+diff --git a/src/audio/CMakeLists.txt b/src/audio/CMakeLists.txt
+index 6300cf2..25a9384 100644
+--- a/src/audio/CMakeLists.txt
++++ b/src/audio/CMakeLists.txt
+@@ -16,6 +16,10 @@ add_library(rexaudio OBJECT
+ )
+ add_library(rex::audio ALIAS rexaudio)
+ 
++if(MINGW AND (CMAKE_SYSTEM_PROCESSOR MATCHES "^(AMD64|amd64|x86_64)$"))
++    target_compile_options(rexaudio PRIVATE -mssse3)
++endif()
++
+ target_include_directories(rexaudio PUBLIC
+     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+diff --git a/src/core/CMakeLists.txt b/src/core/CMakeLists.txt
+index 5ddabd1..f480aa3 100644
+--- a/src/core/CMakeLists.txt
++++ b/src/core/CMakeLists.txt
+@@ -75,6 +75,10 @@ target_include_directories(rexcore PRIVATE
+     ${PROJECT_SOURCE_DIR}/thirdparty/cli11/include
+ )
+ 
++if(MINGW AND (CMAKE_SYSTEM_PROCESSOR MATCHES "^(AMD64|amd64|x86_64)$"))
++    target_compile_options(rexcore PRIVATE -mssse3)
++endif()
++
+ if(UNIX)
+     target_link_libraries(rexcore PRIVATE pthread rt dl)
+ endif()
+diff --git a/src/core/fiber_win32.cpp b/src/core/fiber_win32.cpp
+index 5744a90..60d02b6 100644
+--- a/src/core/fiber_win32.cpp
++++ b/src/core/fiber_win32.cpp
+@@ -11,7 +11,7 @@
+ 
+ #include <rex/platform.h>
+ #if REX_PLATFORM_WIN32
+-#include <Windows.h>
++#include <windows.h>
+ #include <rex/thread/fiber.h>
+ 
+ #include <cassert>
+diff --git a/src/core/platform_win.h b/src/core/platform_win.h
+index 44be14e..22da1c0 100644
+--- a/src/core/platform_win.h
++++ b/src/core/platform_win.h
+@@ -21,8 +21,8 @@
+ #include <windows.h>
+ #include <windowsx.h>
+ 
+-#include <ObjBase.h>
+-#include <SDKDDKVer.h>
++#include <objbase.h>
++#include <sdkddkver.h>
+ #include <bcrypt.h>
+ #include <dwmapi.h>
+ #include <shellapi.h>
+diff --git a/src/core/socket_win.cpp b/src/core/socket_win.cpp
+index 87f1960..65c2d86 100644
+--- a/src/core/socket_win.cpp
++++ b/src/core/socket_win.cpp
+@@ -5,7 +5,7 @@ static_assert(REX_PLATFORM_WIN32, "This file is Windows-only");
+ 
+ #include "platform_win.h"
+ 
+-#include <WinSock2.h>
++#include <winsock2.h>
+ 
+ namespace rex::net {
+ 
+diff --git a/src/core/threading_win.cpp b/src/core/threading_win.cpp
+index 896dfec..5afee94 100644
+--- a/src/core/threading_win.cpp
++++ b/src/core/threading_win.cpp
+@@ -56,11 +56,15 @@ void raise_thread_name_exception(HANDLE thread, const std::string& name) {
+   info.szName = name.c_str();
+   info.dwThreadID = ::GetThreadId(thread);
+   info.dwFlags = 0;
++#if defined(_MSC_VER) && !defined(__MINGW32__)
+   __try {
+     RaiseException(0x406D1388, 0, sizeof(info) / sizeof(ULONG_PTR),
+                    reinterpret_cast<ULONG_PTR*>(&info));
+   } __except (EXCEPTION_EXECUTE_HANDLER) {  // NOLINT
+   }
++#else
++  (void)info;
++#endif
+ }
+ 
+ static void set_thread_name_impl(HANDLE thread, const std::string_view name) {
 diff --git a/src/graphics/d3d12/command_processor.cpp b/src/graphics/d3d12/command_processor.cpp
 index efed1b7..08cd4e9 100644
 --- a/src/graphics/d3d12/command_processor.cpp
@@ -20,6 +197,57 @@ index efed1b7..08cd4e9 100644
            REXGPU_WARN("Vertex fetch constant {} ({:08X} {:08X}) is completely invalid!",
                        vfetch_index, vfetch_constant.dword_0, vfetch_constant.dword_1);
            return false;
+diff --git a/src/graphics/d3d12/pipeline_cache.cpp b/src/graphics/d3d12/pipeline_cache.cpp
+index 8e6b854..061a8aa 100644
+--- a/src/graphics/d3d12/pipeline_cache.cpp
++++ b/src/graphics/d3d12/pipeline_cache.cpp
+@@ -118,18 +118,23 @@ bool PipelineCache::Initialize() {
+   dxc_utils_ = nullptr;
+   dxc_compiler_ = nullptr;
+   if (REXCVAR_GET(d3d12_dxbc_disasm_dxilconv)) {
+-    if (FAILED(provider.DxbcConverterCreateInstance(CLSID_DxbcConverter,
+-                                                    IID_PPV_ARGS(&dxbc_converter_)))) {
++    if (FAILED(provider.DxbcConverterCreateInstance(
++            CLSID_DxbcConverter, kIID_IDxbcConverter,
++            reinterpret_cast<void**>(&dxbc_converter_)))) {
+       REXGPU_ERROR(
+           "Failed to create DxbcConverter, converted DXIL disassembly for "
+           "debugging will be unavailable");
+     }
+-    if (FAILED(provider.DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&dxc_utils_)))) {
++    if (FAILED(provider.DxcCreateInstance(
++            CLSID_DxcUtils, kIID_IDxcUtils,
++            reinterpret_cast<void**>(&dxc_utils_)))) {
+       REXGPU_ERROR(
+           "Failed to create DxcUtils, converted DXIL disassembly for debugging "
+           "will be unavailable");
+     }
+-    if (FAILED(provider.DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&dxc_compiler_)))) {
++    if (FAILED(provider.DxcCreateInstance(
++            CLSID_DxcCompiler, kIID_IDxcCompiler,
++            reinterpret_cast<void**>(&dxc_compiler_)))) {
+       REXGPU_ERROR(
+           "Failed to create DxcCompiler, converted DXIL disassembly for "
+           "debugging will be unavailable");
+@@ -382,9 +387,15 @@ void PipelineCache::InitializeShaderStorage(const std::filesystem::path& cache_r
+       IDxcCompiler* dxc_compiler = nullptr;
+       if (REXCVAR_GET(d3d12_dxbc_disasm_dxilconv) && dxbc_converter_ && dxc_utils_ &&
+           dxc_compiler_) {
+-        provider.DxbcConverterCreateInstance(CLSID_DxbcConverter, IID_PPV_ARGS(&dxbc_converter));
+-        provider.DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&dxc_utils));
+-        provider.DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&dxc_compiler));
++        provider.DxbcConverterCreateInstance(
++            CLSID_DxbcConverter, kIID_IDxbcConverter,
++            reinterpret_cast<void**>(&dxbc_converter));
++        provider.DxcCreateInstance(
++            CLSID_DxcUtils, kIID_IDxcUtils,
++            reinterpret_cast<void**>(&dxc_utils));
++        provider.DxcCreateInstance(
++            CLSID_DxcCompiler, kIID_IDxcCompiler,
++            reinterpret_cast<void**>(&dxc_compiler));
+       }
+       for (;;) {
+         D3D12Shader* shader_to_translate;
 diff --git a/src/graphics/vulkan/command_processor.cpp b/src/graphics/vulkan/command_processor.cpp
 index a40436e..d9969b6 100644
 --- a/src/graphics/vulkan/command_processor.cpp
@@ -42,6 +270,77 @@ index a40436e..d9969b6 100644
            REXGPU_WARN("Vertex fetch constant {} ({:08X} {:08X}) is completely invalid!",
                        vfetch_index, vfetch_constant.dword_0, vfetch_constant.dword_1);
            return false;
+diff --git a/src/input/mnk/mnk_input_driver.cpp b/src/input/mnk/mnk_input_driver.cpp
+index b8eae3c..c244152 100644
+--- a/src/input/mnk/mnk_input_driver.cpp
++++ b/src/input/mnk/mnk_input_driver.cpp
+@@ -23,7 +23,7 @@
+ 
+ #if REX_PLATFORM_WIN32
+ #include <rex/ui/window_win.h>
+-#include <Windows.h>
++#include <windows.h>
+ #endif
+ 
+ REXCVAR_DEFINE_BOOL(mnk_mode, false, "Input", "Enable keyboard/mouse controller emulation");
+diff --git a/src/input/xinput/xinput_input_driver.cpp b/src/input/xinput/xinput_input_driver.cpp
+index 844612b..4e2fd46 100644
+--- a/src/input/xinput/xinput_input_driver.cpp
++++ b/src/input/xinput/xinput_input_driver.cpp
+@@ -73,12 +73,12 @@ X_STATUS XinputInputDriver::Setup() {
+   }
+ 
+   module_ = module;
+-  XInputGetCapabilities_ = xigc;
+-  XInputGetState_ = xigs;
+-  XInputGetStateEx_ = xigsEx;
+-  XInputGetKeystroke_ = xigk;
+-  XInputSetState_ = xiss;
+-  XInputEnable_ = xie;
++  XInputGetCapabilities_ = reinterpret_cast<void*>(xigc);
++  XInputGetState_ = reinterpret_cast<void*>(xigs);
++  XInputGetStateEx_ = reinterpret_cast<void*>(xigsEx);
++  XInputGetKeystroke_ = reinterpret_cast<void*>(xigk);
++  XInputSetState_ = reinterpret_cast<void*>(xiss);
++  XInputEnable_ = reinterpret_cast<void*>(xie);
+ 
+   return X_STATUS_SUCCESS;
+ }
+diff --git a/src/kernel/CMakeLists.txt b/src/kernel/CMakeLists.txt
+index 99ea636..69bcffb 100644
+--- a/src/kernel/CMakeLists.txt
++++ b/src/kernel/CMakeLists.txt
+@@ -66,4 +66,30 @@ set(REXKERNEL_SOURCES
+ list(TRANSFORM REXKERNEL_SOURCES PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/")
+ target_sources(rexruntime PRIVATE ${REXKERNEL_SOURCES})
+ 
++if(MINGW)
++    # Guest hooks are implemented with source-level names beginning "__imp__".
++    # In PE/COFF that prefix denotes an IAT slot, so calling such a symbol
++    # directly executes non-executable .rdata (BEX64). Export a safe thunk name
++    # for generated MinGW code, plus the conventional MSVC-compatible alias.
++    set(REX_KERNEL_EXPORT_DEF "${CMAKE_CURRENT_BINARY_DIR}/rex_kernel_exports.def")
++    set(REX_KERNEL_EXPORT_SYMBOLS)
++    foreach(REX_KERNEL_SOURCE IN LISTS REXKERNEL_SOURCES)
++        file(READ "${REX_KERNEL_SOURCE}" REX_KERNEL_SOURCE_TEXT)
++        string(REGEX MATCHALL "__imp__[A-Za-z0-9_]+" REX_SOURCE_EXPORTS
++               "${REX_KERNEL_SOURCE_TEXT}")
++        list(APPEND REX_KERNEL_EXPORT_SYMBOLS ${REX_SOURCE_EXPORTS})
++    endforeach()
++    list(REMOVE_DUPLICATES REX_KERNEL_EXPORT_SYMBOLS)
++    file(WRITE "${REX_KERNEL_EXPORT_DEF}" "EXPORTS\n")
++    foreach(REX_KERNEL_EXPORT IN LISTS REX_KERNEL_EXPORT_SYMBOLS)
++        string(REGEX REPLACE "^__imp_" "" REX_KERNEL_IMPORT_NAME
++               "${REX_KERNEL_EXPORT}")
++        file(APPEND "${REX_KERNEL_EXPORT_DEF}"
++             "  ${REX_KERNEL_IMPORT_NAME}=${REX_KERNEL_EXPORT}\n")
++        file(APPEND "${REX_KERNEL_EXPORT_DEF}"
++             "  rex_${REX_KERNEL_EXPORT}=${REX_KERNEL_EXPORT}\n")
++    endforeach()
++    target_sources(rexruntime PRIVATE "${REX_KERNEL_EXPORT_DEF}")
++endif()
++
+ target_link_libraries(rexruntime PRIVATE o1heap rexcore rexfilesystem rexgraphics rexui rexaudio rexinput imgui)
 diff --git a/src/kernel/xboxkrnl/xboxkrnl_memory.cpp b/src/kernel/xboxkrnl/xboxkrnl_memory.cpp
 index 8684eda..8963d8a 100644
 --- a/src/kernel/xboxkrnl/xboxkrnl_memory.cpp
@@ -159,11 +458,25 @@ index 5709e6d..0b94c3f 100644
      path = path.substr(4);  // Strip the full qualifier
    }
  
+diff --git a/src/system/CMakeLists.txt b/src/system/CMakeLists.txt
+index 4c9d2e0..dc42fd3 100644
+--- a/src/system/CMakeLists.txt
++++ b/src/system/CMakeLists.txt
+@@ -51,6 +51,9 @@ add_library(rex::system ALIAS rexruntime)
+ add_library(rex::kernel ALIAS rexruntime)
+ 
+ set_target_properties(rexruntime PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
++if(MINGW)
++    target_link_options(rexruntime PRIVATE -Wl,--export-all-symbols)
++endif()
+ 
+ target_include_directories(rexruntime PUBLIC
+     $<BUILD_INTERFACE:${REXGLUE_ROOT}/include>
 diff --git a/src/system/xmemory.cpp b/src/system/xmemory.cpp
-index ca7f4e8..822dc8c 100644
+index ca7f4e8..5765a7e 100644
 --- a/src/system/xmemory.cpp
 +++ b/src/system/xmemory.cpp
-@@ -465,6 +465,68 @@ bool Memory::AccessViolationCallback(std::unique_lock<std::recursive_mutex> glob
+@@ -465,6 +465,70 @@ bool Memory::AccessViolationCallback(std::unique_lock<std::recursive_mutex> glob
      return false;
    }
    if (heap->heap_type() != memory::HeapType::kGuestPhysical) {
@@ -211,15 +524,17 @@ index ca7f4e8..822dc8c 100644
 +      // while its reserved host page has not been committed yet. Protect
 +      // cannot commit such a page on Windows, so commit it at the existing
 +      // fixed mapping and retry the faulting instruction.
-+      if (rex::memory::AllocFixed(reinterpret_cast<void*>(page_base),
-+                                  host_page_size,
-+                                  rex::memory::AllocationType::kCommit,
-+                                  page_access)) {
++      const uint32_t guest_page_size = heap->page_size();
++      const uint32_t guest_page_base =
++          virtual_address & ~(guest_page_size - 1);
++      if (heap->AllocFixed(guest_page_base, guest_page_size,
++                           guest_page_size,
++                           memory::kMemoryAllocationCommit, guest_protect)) {
 +        REXSYS_DEBUG(
 +            "Committed stale {} virtual page for guest {:08X} "
-+            "(host {:016X}, guest_protect {:08X})",
++            "(Xbox page {:08X}+{:X}, guest_protect {:08X})",
 +            is_write ? "writable" : "readable", virtual_address,
-+            static_cast<uint64_t>(page_base), guest_protect);
++            guest_page_base, guest_page_size, guest_protect);
 +        return true;
 +      }
 +    }
@@ -232,7 +547,7 @@ index ca7f4e8..822dc8c 100644
      return false;
    }
  
-@@ -547,6 +609,81 @@ bool Memory::AccessViolationCallback(std::unique_lock<std::recursive_mutex> glob
+@@ -547,6 +611,81 @@ bool Memory::AccessViolationCallback(std::unique_lock<std::recursive_mutex> glob
          "guest_protect={:08X} physical_protect={:08X}",
          virtual_address, static_cast<uint64_t>(reinterpret_cast<uintptr_t>(host_address)),
          physical_address, current_guest_protect, physical_protect);
@@ -314,7 +629,7 @@ index ca7f4e8..822dc8c 100644
    }
  
    return false;
-@@ -1162,7 +1299,12 @@ bool BaseHeap::AllocRange(uint32_t low_address, uint32_t high_address, uint32_t
+@@ -1162,7 +1301,12 @@ bool BaseHeap::AllocRange(uint32_t low_address, uint32_t high_address, uint32_t
  
    uint32_t available_page_count = high_page_number - low_page_number + 1;
    if (!page_count || page_count > available_page_count) {
@@ -328,7 +643,7 @@ index ca7f4e8..822dc8c 100644
      return false;
    }
  
-@@ -1698,7 +1840,12 @@ bool PhysicalHeap::AllocRange(uint32_t low_address, uint32_t high_address, uint3
+@@ -1698,7 +1842,12 @@ bool PhysicalHeap::AllocRange(uint32_t low_address, uint32_t high_address, uint3
    uint32_t parent_address;
    if (!parent_heap_->AllocRange(parent_low_address, parent_high_address, size, alignment,
                                  allocation_type, protect, top_down, &parent_address)) {
@@ -342,3 +657,136 @@ index ca7f4e8..822dc8c 100644
      return false;
    }
  
+diff --git a/src/system/xsocket.cpp b/src/system/xsocket.cpp
+index 0b44e06..7404e6f 100644
+--- a/src/system/xsocket.cpp
++++ b/src/system/xsocket.cpp
+@@ -21,9 +21,10 @@
+ 
+ // Standard socket types used by Xbox API emulation
+ #if REX_PLATFORM_WIN32
+-#include <WinSock2.h>
++#include <winsock2.h>
+ 
+-#include <WS2tcpip.h>
++#include <ws2tcpip.h>
++#undef IPPROTO_UDP
+ #else
+ #include <arpa/inet.h>
+ #include <netinet/in.h>
+diff --git a/src/ui/CMakeLists.txt b/src/ui/CMakeLists.txt
+index 18ad4ad..9648029 100644
+--- a/src/ui/CMakeLists.txt
++++ b/src/ui/CMakeLists.txt
+@@ -134,7 +134,7 @@ endif()
+ if(WIN32)
+     target_link_libraries(rexui PUBLIC
+         dwmapi
+-        Shcore
++        shcore
+     )
+ else()
+     find_package(PkgConfig REQUIRED)
+diff --git a/src/ui/d3d12/d3d12_provider.cpp b/src/ui/d3d12/d3d12_provider.cpp
+index bf8252b..3a2eeea 100644
+--- a/src/ui/d3d12/d3d12_provider.cpp
++++ b/src/ui/d3d12/d3d12_provider.cpp
+@@ -256,7 +256,7 @@ bool D3D12Provider::Initialize() {
+   while (dxgi_factory->EnumAdapters1(adapter_index, &adapter) == S_OK) {
+     DXGI_ADAPTER_DESC1 adapter_desc;
+     if (SUCCEEDED(adapter->GetDesc1(&adapter_desc))) {
+-      if (SUCCEEDED(pfn_d3d12_create_device_(adapter, D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device),
++      if (SUCCEEDED(pfn_d3d12_create_device_(adapter, D3D_FEATURE_LEVEL_11_0, IID_ID3D12Device,
+                                              nullptr))) {
+         if (REXCVAR_GET(d3d12_adapter) >= 0) {
+           if (adapter_index == REXCVAR_GET(d3d12_adapter)) {
+@@ -462,7 +462,13 @@ bool D3D12Provider::Initialize() {
+ 
+   // Get the graphics analysis interface, will silently fail if PIX is not
+   // attached.
++#if __has_include(<DXProgrammableCapture.h>)
+   pfn_dxgi_get_debug_interface1_(0, IID_PPV_ARGS(&graphics_analysis_));
++#else
++  pfn_dxgi_get_debug_interface1_(
++      0, kIID_IDXGraphicsAnalysis,
++      reinterpret_cast<void**>(&graphics_analysis_));
++#endif
+ 
+   return true;
+ }
+diff --git a/src/ui/window_win.cpp b/src/ui/window_win.cpp
+index 09c44a3..e004155 100644
+--- a/src/ui/window_win.cpp
++++ b/src/ui/window_win.cpp
+@@ -31,7 +31,7 @@
+ #include <rex/ui/virtual_key.h>
+ #include <rex/ui/windowed_app_context_win.h>
+ 
+-#include <ShellScalingApi.h>
++#include <shellscalingapi.h>
+ #include <dwmapi.h>
+ #include <shellapi.h>
+ #include <tpcshrd.h>
+diff --git a/src/ui/windowed_app_context_win.cpp b/src/ui/windowed_app_context_win.cpp
+index d18820d..f1a869a 100644
+--- a/src/ui/windowed_app_context_win.cpp
++++ b/src/ui/windowed_app_context_win.cpp
+@@ -38,25 +38,35 @@ bool Win32WindowedAppContext::Initialize() {
+   shcore_module_ = LoadLibraryW(L"SHCore.dll");
+   if (shcore_module_) {
+     per_monitor_dpi_v1_api_available_ = true;
++    per_monitor_dpi_v1_api_.get_dpi_for_monitor =
++        reinterpret_cast<decltype(per_monitor_dpi_v1_api_.get_dpi_for_monitor)>(
++            GetProcAddress(shcore_module_, "GetDpiForMonitor"));
+     per_monitor_dpi_v1_api_available_ &=
+-        (*reinterpret_cast<void**>(&per_monitor_dpi_v1_api_.get_dpi_for_monitor) =
+-             GetProcAddress(shcore_module_, "GetDpiForMonitor")) != nullptr;
++        per_monitor_dpi_v1_api_.get_dpi_for_monitor != nullptr;
+   }
+   user32_module_ = LoadLibraryW(L"user32.dll");
+   if (user32_module_) {
+     per_monitor_dpi_v2_api_available_ = true;
++    per_monitor_dpi_v2_api_.adjust_window_rect_ex_for_dpi =
++        reinterpret_cast<decltype(per_monitor_dpi_v2_api_.adjust_window_rect_ex_for_dpi)>(
++            GetProcAddress(user32_module_, "AdjustWindowRectExForDpi"));
+     per_monitor_dpi_v2_api_available_ &=
+-        (*reinterpret_cast<void**>(&per_monitor_dpi_v2_api_.adjust_window_rect_ex_for_dpi) =
+-             GetProcAddress(user32_module_, "AdjustWindowRectExForDpi")) != nullptr;
++        per_monitor_dpi_v2_api_.adjust_window_rect_ex_for_dpi != nullptr;
++    per_monitor_dpi_v2_api_.enable_non_client_dpi_scaling =
++        reinterpret_cast<decltype(per_monitor_dpi_v2_api_.enable_non_client_dpi_scaling)>(
++            GetProcAddress(user32_module_, "EnableNonClientDpiScaling"));
+     per_monitor_dpi_v2_api_available_ &=
+-        (*reinterpret_cast<void**>(&per_monitor_dpi_v2_api_.enable_non_client_dpi_scaling) =
+-             GetProcAddress(user32_module_, "EnableNonClientDpiScaling")) != nullptr;
++        per_monitor_dpi_v2_api_.enable_non_client_dpi_scaling != nullptr;
++    per_monitor_dpi_v2_api_.get_dpi_for_system =
++        reinterpret_cast<decltype(per_monitor_dpi_v2_api_.get_dpi_for_system)>(
++            GetProcAddress(user32_module_, "GetDpiForSystem"));
+     per_monitor_dpi_v2_api_available_ &=
+-        (*reinterpret_cast<void**>(&per_monitor_dpi_v2_api_.get_dpi_for_system) =
+-             GetProcAddress(user32_module_, "GetDpiForSystem")) != nullptr;
++        per_monitor_dpi_v2_api_.get_dpi_for_system != nullptr;
++    per_monitor_dpi_v2_api_.get_dpi_for_window =
++        reinterpret_cast<decltype(per_monitor_dpi_v2_api_.get_dpi_for_window)>(
++            GetProcAddress(user32_module_, "GetDpiForWindow"));
+     per_monitor_dpi_v2_api_available_ &=
+-        (*reinterpret_cast<void**>(&per_monitor_dpi_v2_api_.get_dpi_for_window) =
+-             GetProcAddress(user32_module_, "GetDpiForWindow")) != nullptr;
++        per_monitor_dpi_v2_api_.get_dpi_for_window != nullptr;
+   }
+ 
+   // Create the message-only window for executing pending functions - using a
+diff --git a/thirdparty/FFmpeg/libavutil/internal.h b/thirdparty/FFmpeg/libavutil/internal.h
+index 2ed1c2abb1..ee04febb0c 100644
+--- a/thirdparty/FFmpeg/libavutil/internal.h
++++ b/thirdparty/FFmpeg/libavutil/internal.h
+@@ -177,7 +177,7 @@ void avpriv_report_missing_feature(void *avc,
+ void avpriv_request_sample(void *avc,
+                            const char *msg, ...) av_printf_format(2, 3);
+ 
+-#if HAVE_LIBC_MSVCRT
++#if HAVE_LIBC_MSVCRT && !defined(__MINGW32__)
+ #include <crtversion.h>
+ #if defined(_VC_CRT_MAJOR_VERSION) && _VC_CRT_MAJOR_VERSION < 14
+ #pragma comment(linker, "/include:" EXTERN_PREFIX "avpriv_strtod")
