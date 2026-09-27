@@ -43,7 +43,7 @@ index a40436e..d9969b6 100644
                        vfetch_index, vfetch_constant.dword_0, vfetch_constant.dword_1);
            return false;
 diff --git a/src/kernel/xboxkrnl/xboxkrnl_memory.cpp b/src/kernel/xboxkrnl/xboxkrnl_memory.cpp
-index 8684eda..19a7220 100644
+index 8684eda..8963d8a 100644
 --- a/src/kernel/xboxkrnl/xboxkrnl_memory.cpp
 +++ b/src/kernel/xboxkrnl/xboxkrnl_memory.cpp
 @@ -126,9 +126,12 @@ u32 NtAllocateVirtualMemory_entry(mapped_u32 base_addr_ptr, mapped_u32 region_si
@@ -62,7 +62,35 @@ index 8684eda..19a7220 100644
    // Use 64KB allocation granularity when no base address is specified,
    // matching Xbox 360 behavior. With a base address, use the heap's page size.
    adjusted_size = rex::round_up(adjusted_size, adjusted_base ? page_size : 64 * 1024);
-@@ -391,16 +394,47 @@ u32 MmAllocatePhysicalMemoryEx_entry(u32 flags, u32 region_size, u32 protect_bit
+@@ -357,6 +360,27 @@ u32 MmAllocatePhysicalMemoryEx_entry(u32 flags, u32 region_size, u32 protect_bit
+     return 0;
+   }
+ 
++  // OutRun stores physical-buffer attributes in the upper two bits of a size
++  // field and passes that packed value through its allocation wrapper. A
++  // request such as 0x40000288 cannot be a literal allocation on a 512 MiB
++  // Xbox 360; the intended byte count is the low 30 bits. Leaving the tag in
++  // the size makes allocation fail and the title immediately dereference the
++  // null result while entering a race.
++  if (region_size > 0x20000000u && (region_size & 0xC0000000u)) {
++    uint32_t packed_region_size = region_size;
++    region_size &= 0x3FFFFFFFu;
++    if (!region_size) {
++      REXKRNL_ERROR(
++          "MmAllocatePhysicalMemoryEx: packed size {:#x} has no byte count",
++          packed_region_size);
++      return 0;
++    }
++    REXKRNL_WARN(
++        "MmAllocatePhysicalMemoryEx normalized packed OutRun size {:#x} to "
++        "{:#x}",
++        packed_region_size, region_size);
++  }
++
+   // Either may be OR'ed into protect_bits:
+   // X_PAGE_NOCACHE
+   // X_PAGE_WRITECOMBINE
+@@ -391,16 +415,47 @@ u32 MmAllocatePhysicalMemoryEx_entry(u32 flags, u32 region_size, u32 protect_bit
    // for title 545108B4 where min_addr_range comparison fails due to 0x1000 offset.
    // If needed, set heap_physical_address_offset = 0 when min_addr_range && max_addr_range.
    // Reference: xenia-canary 81aaf98e0.
@@ -132,7 +160,7 @@ index 5709e6d..0b94c3f 100644
    }
  
 diff --git a/src/system/xmemory.cpp b/src/system/xmemory.cpp
-index ca7f4e8..33bd412 100644
+index ca7f4e8..822dc8c 100644
 --- a/src/system/xmemory.cpp
 +++ b/src/system/xmemory.cpp
 @@ -465,6 +465,68 @@ bool Memory::AccessViolationCallback(std::unique_lock<std::recursive_mutex> glob
@@ -187,7 +215,7 @@ index ca7f4e8..33bd412 100644
 +                                  host_page_size,
 +                                  rex::memory::AllocationType::kCommit,
 +                                  page_access)) {
-+        REXSYS_WARN(
++        REXSYS_DEBUG(
 +            "Committed stale {} virtual page for guest {:08X} "
 +            "(host {:016X}, guest_protect {:08X})",
 +            is_write ? "writable" : "readable", virtual_address,
