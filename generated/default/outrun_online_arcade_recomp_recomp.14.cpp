@@ -41128,6 +41128,17 @@ loc_8228C4C4:
 	ctx.r9.u64 = REX_LOAD_U32(ctx.r31.u32 + 32);
 	// add r11,r11,r31
 	ctx.r11.u64 = ctx.r11.u64 + ctx.r31.u64;
+	// Streamed resource records can contain a stale or non-project relative
+	// pointer here. Validate the nested project header before reading its
+	// fields at +872/+896/+900. The failing trace attempted +896 at guest
+	// 0x310D8828, which was completely unallocated.
+	if (!rex_is_guest_range_readable(base, ctx.r11.u32 + 872, 32)) {
+		REXCPU_WARN(
+			"Skipped invalid nested OutRun project record: owner={:08X} "
+			"record={:08X} header={:08X}",
+			ctx.r31.u32, ctx.r27.u32, ctx.r11.u32);
+		goto loc_8228C538;
+	}
 	// addi r10,r11,872
 	ctx.r10.s64 = ctx.r11.s64 + 872;
 	// lwz r8,896(r11)
@@ -41154,6 +41165,17 @@ loc_8228C4C4:
 	ctx.r29.u64 = ctx.r10.u64;
 	// mr r28,r11
 	ctx.r28.u64 = ctx.r11.u64;
+	// Each entry consumed below is a four-byte packed descriptor. Reject a
+	// corrupt count/table pair before entering the copy loop.
+	if (ctx.r28.u32 > 0x10000000u ||
+		!rex_is_guest_range_readable(
+			base, ctx.r29.u32, static_cast<uint32_t>(ctx.r28.u32 * 4u))) {
+		REXCPU_WARN(
+			"Skipped invalid nested OutRun descriptor table: "
+			"table={:08X} count={:08X}",
+			ctx.r29.u32, ctx.r28.u32);
+		goto loc_8228C538;
+	}
 loc_8228C504:
 	// lwz r11,0(r29)
 	ctx.r11.u64 = REX_LOAD_U32(ctx.r29.u32 + 0);
@@ -41163,6 +41185,13 @@ loc_8228C504:
 	ctx.r11.s64 = static_cast<int64_t>(ctx.r11.u64 * static_cast<uint64_t>(12));
 	// add r4,r11,r26
 	ctx.r4.u64 = ctx.r11.u64 + ctx.r26.u64;
+	if (!rex_is_guest_range_readable(base, ctx.r4.u32, 12)) {
+		REXCPU_WARN(
+			"Skipped invalid nested OutRun descriptor source: "
+			"source={:08X} table={:08X}",
+			ctx.r4.u32, ctx.r29.u32);
+		goto loc_8228C528;
+	}
 	// cmplw cr6,r30,r4
 	ctx.cr6.compare<uint32_t>(ctx.r30.u32, ctx.r4.u32, ctx.xer);
 	// beq cr6,0x8228c528
@@ -48846,6 +48875,18 @@ DEFINE_REX_FUNC(sub_8228F910) {
 	REX_STORE_U64(ctx.r1.u32 + -16, ctx.r30.u64);
 	// std r31,-8(r1)
 	REX_STORE_U64(ctx.r1.u32 + -8, ctx.r31.u64);
+	// A streamed project can be removed while a later comparison still holds
+	// one of its embedded object pointers. Validate both object headers before
+	// touching them; treating a stale comparison as incompatible matches the
+	// normal failure return below and lets the loader discard the entry.
+	if (!rex_is_guest_range_readable(base, ctx.r3.u32, 36) ||
+		!rex_is_guest_range_readable(base, ctx.r4.u32, 36)) {
+		REXCPU_WARN(
+			"Skipped invalid OutRun object comparison: left={:08X} "
+			"right={:08X}",
+			ctx.r3.u32, ctx.r4.u32);
+		goto loc_8228FA24;
+	}
 	// lbz r11,8(r3)
 	ctx.r11.u64 = REX_LOAD_U8(ctx.r3.u32 + 8);
 	// clrlwi r11,r11,29
@@ -48900,6 +48941,20 @@ loc_8228F948:
 	ctx.r6.s64 = 0;
 	// add r10,r10,r3
 	ctx.r10.u64 = ctx.r10.u64 + ctx.r3.u64;
+	// Both loops below consume packed four-byte entries. Guard the derived
+	// ranges as well as the headers so corrupt offsets/counts cannot escape
+	// into an uncommitted streamed-resource page.
+	if (ctx.r7.u32 > 0x10000000u || ctx.r9.u32 > 0x10000000u ||
+		!rex_is_guest_range_readable(
+			base, ctx.r10.u32, static_cast<uint32_t>(ctx.r7.u32 * 4u)) ||
+		!rex_is_guest_range_readable(
+			base, ctx.r8.u32, static_cast<uint32_t>(ctx.r9.u32 * 4u))) {
+		REXCPU_WARN(
+			"Skipped invalid OutRun object comparison tables: "
+			"left={:08X}/{:08X} right={:08X}/{:08X}",
+			ctx.r10.u32, ctx.r7.u32, ctx.r8.u32, ctx.r9.u32);
+		goto loc_8228FA24;
+	}
 	// beq 0x8228fa00
 	if (ctx.cr0.eq) goto loc_8228FA00;
 loc_8228F980:
@@ -49012,6 +49067,16 @@ DEFINE_REX_FUNC(sub_8228FA38) {
 	REX_STORE_U64(ctx.r1.u32 + -16, ctx.r30.u64);
 	// std r31,-8(r1)
 	REX_STORE_U64(ctx.r1.u32 + -8, ctx.r31.u64);
+	// This merge routine receives the same streamed object pair as
+	// sub_8228F910 and can therefore observe the same dangling pointers.
+	if (!rex_is_guest_range_readable(base, ctx.r3.u32, 36) ||
+		!rex_is_guest_range_readable(base, ctx.r4.u32, 36)) {
+		REXCPU_WARN(
+			"Skipped invalid OutRun object merge: destination={:08X} "
+			"source={:08X}",
+			ctx.r3.u32, ctx.r4.u32);
+		goto loc_8228FB30;
+	}
 	// lbz r11,8(r3)
 	ctx.r11.u64 = REX_LOAD_U8(ctx.r3.u32 + 8);
 	// clrlwi r11,r11,29
@@ -49066,6 +49131,19 @@ loc_8228FA70:
 	ctx.r11.u64 = ctx.r11.u64 + ctx.r3.u64;
 	// mr r8,r11
 	ctx.r8.u64 = ctx.r11.u64;
+	// The source and destination tables contain four-byte packed entries.
+	// Validate the complete spans before the read/write loops.
+	if (ctx.r6.u32 > 0x10000000u || ctx.r10.u32 > 0x10000000u ||
+		!rex_is_guest_range_readable(
+			base, ctx.r11.u32, static_cast<uint32_t>(ctx.r6.u32 * 4u)) ||
+		!rex_is_guest_range_readable(
+			base, ctx.r7.u32, static_cast<uint32_t>(ctx.r10.u32 * 4u))) {
+		REXCPU_WARN(
+			"Skipped invalid OutRun object merge tables: "
+			"destination={:08X}/{:08X} source={:08X}/{:08X}",
+			ctx.r11.u32, ctx.r6.u32, ctx.r7.u32, ctx.r10.u32);
+		goto loc_8228FB30;
+	}
 	// beq 0x8228faf4
 	if (ctx.cr0.eq) goto loc_8228FAF4;
 	// mtctr r10

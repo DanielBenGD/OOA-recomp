@@ -7140,6 +7140,12 @@ DEFINE_REX_FUNC(sub_821F3078) {
 	sub_821CCE70(ctx, base);
 	// lwz r11,4(r31)
 	ctx.r11.u64 = REX_LOAD_U32(ctx.r31.u32 + 4);
+	if (!rex_is_guest_range_readable(base, ctx.r11.u32, 4)) {
+		REXCPU_WARN(
+			"Skipped invalid OutRun resource index header: {:08X}",
+			ctx.r11.u32);
+		goto loc_821F31BC;
+	}
 	// lwz r10,0(r11)
 	ctx.r10.u64 = REX_LOAD_U32(ctx.r11.u32 + 0);
 	// cmplwi cr6,r10,0
@@ -7153,6 +7159,14 @@ DEFINE_REX_FUNC(sub_821F3078) {
 loc_821F30C8:
 	// lwz r10,0(r31)
 	ctx.r10.u64 = REX_LOAD_U32(ctx.r31.u32 + 0);
+	if (!rex_is_guest_range_readable(
+			base, ctx.r10.u32 + ctx.r11.u32, 12)) {
+		REXCPU_WARN(
+			"Stopped invalid OutRun resource index swap: "
+			"base={:08X} offset={:08X}",
+			ctx.r10.u32, ctx.r11.u32);
+		goto loc_821F3104;
+	}
 	// lwbrx r9,r11,r10
 	ctx.r9.u64 = __builtin_bswap32(REX_LOAD_U32(ctx.r11.u32 + ctx.r10.u32));
 	// stwx r9,r11,r10
@@ -7231,6 +7245,15 @@ loc_821F3158:
 	// li r10,0
 	ctx.r10.s64 = 0;
 loc_821F315C:
+	// The loader may return an address even when the backing virtual range
+	// wasn't committed. Never turn that guest-side failure into a native
+	// access violation while parsing the resource header.
+	if (!rex_is_guest_range_readable(base, ctx.r3.u32, 8)) {
+		REXCPU_WARN(
+			"Skipped unbacked OutRun resource buffer: {:08X}",
+			ctx.r3.u32);
+		goto loc_821F31BC;
+	}
 	// lwbrx r9,0,r3
 	ctx.r9.u64 = __builtin_bswap32(REX_LOAD_U32(ctx.r3.u32));
 	// lis r8,-32116
@@ -7245,6 +7268,15 @@ loc_821F315C:
 	REX_STORE_U32(ctx.r3.u32 + 0, ctx.r9.u32);
 	// beq cr6,0x821f31bc
 	if (ctx.cr6.eq) goto loc_821F31BC;
+	if (ctx.r10.u32 > 0x0CCCCCCCu ||
+		!rex_is_guest_range_readable(
+			base, ctx.r11.u32, static_cast<uint32_t>(ctx.r10.u32 * 20u))) {
+		REXCPU_WARN(
+			"Skipped invalid OutRun resource record table: "
+			"table={:08X} count={:08X}",
+			ctx.r11.u32, ctx.r10.u32);
+		goto loc_821F31BC;
+	}
 	// mtctr r10
 	ctx.ctr.u64 = ctx.r10.u64;
 loc_821F317C:
