@@ -46349,6 +46349,20 @@ DEFINE_REX_FUNC(sub_824B1960) {
 	uint32_t ea{};
 	// std r3,-8(r1)
 	REX_STORE_U64(ctx.r1.u32 + -8, ctx.r3.u64);
+	// OutRun may ask its optimized memcpy to consume a streamed-resource span
+	// whose final page has already been released. Validate the complete source
+	// and destination ranges before the alignment-specific loops below. The
+	// observed 12-byte copy crossed from 0x4192FFFC into the unallocated page
+	// at 0x41930000.
+	if (!rex_is_guest_range_readable(base, ctx.r4.u32, ctx.r5.u32) ||
+		!rex_is_guest_range_readable(base, ctx.r3.u32, ctx.r5.u32)) {
+		REXCPU_WARN(
+			"Skipped invalid OutRun memory copy: destination={:08X} "
+			"source={:08X} size={:08X} caller={:08X}",
+			ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+			static_cast<uint32_t>(ctx.lr));
+		return;
+	}
 	// clrlwi r6,r3,29
 	ctx.r6.u64 = ctx.r3.u32 & 0x7;
 	// dcbt r0,r4
