@@ -37,6 +37,10 @@
 #include <string_view>
 #include <unordered_map>
 
+#if REX_PLATFORM_WIN32
+#include <windows.h>
+#endif
+
 //=============================================================================
 // Image Info
 //=============================================================================
@@ -115,6 +119,47 @@ extern PPCFuncMapping PPCFuncMappings[];
 #define REX_STORE_U64(x, y) (*(volatile u64*)(base + (u32)(x) + REX_PHYS_HOST_OFFSET(x)) = __builtin_bswap64(y))
 
 #define REX_MEMORY_SIZE 0x100000000ull
+
+// Checks host page protection before a title-specific recovery path touches a
+// guest range. This is intentionally not used by normal generated loads: it is
+// for rejecting a known dangling OutRun model descriptor without turning the
+// guest bug into a native access violation.
+inline bool rex_is_guest_range_readable(const u8* base, u32 guest_address,
+                                        size_t size) {
+#if REX_PLATFORM_WIN32
+  uintptr_t current = reinterpret_cast<uintptr_t>(
+      base + guest_address + REX_PHYS_HOST_OFFSET(guest_address));
+  const uintptr_t end = current + size;
+  if (end < current) {
+    return false;
+  }
+  while (current < end) {
+    MEMORY_BASIC_INFORMATION info{};
+    if (!VirtualQuery(reinterpret_cast<const void*>(current), &info,
+                      sizeof(info)) ||
+        info.State != MEM_COMMIT ||
+        (info.Protect & (PAGE_GUARD | PAGE_NOACCESS))) {
+      return false;
+    }
+    const DWORD access = info.Protect & 0xFF;
+    if (access != PAGE_READONLY && access != PAGE_READWRITE &&
+        access != PAGE_WRITECOPY && access != PAGE_EXECUTE_READ &&
+        access != PAGE_EXECUTE_READWRITE &&
+        access != PAGE_EXECUTE_WRITECOPY) {
+      return false;
+    }
+    const uintptr_t region_end =
+        reinterpret_cast<uintptr_t>(info.BaseAddress) + info.RegionSize;
+    if (region_end <= current) {
+      return false;
+    }
+    current = region_end < end ? region_end : end;
+  }
+  return true;
+#else
+  return true;
+#endif
+}
 
 //=============================================================================
 // MMIO

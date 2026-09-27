@@ -37410,6 +37410,17 @@ loc_8228ABF8:
 	if (ctx.cr6.eq) goto loc_8228AD24;
 	// add r11,r10,r11
 	ctx.r11.u64 = ctx.r10.u64 + ctx.r11.u64;
+	// OutRun may leave a streamed model project's relative descriptor pointer
+	// dangling when the backing range has already been released. The original
+	// Xbox runtime treats the missing descriptor as an unavailable project;
+	// don't let the following paired 64-bit reads become a native host crash.
+	if (!rex_is_guest_range_readable(base, ctx.r11.u32, 16)) {
+		REXCPU_WARN(
+			"Skipped invalid OutRun model descriptor: manager={:08X} "
+			"project={:08X} descriptor={:08X}",
+			ctx.r30.u32, ctx.r29.u32, ctx.r11.u32);
+		goto loc_8228AD24;
+	}
 	// ld r10,0(r30)
 	ctx.r10.u64 = REX_LOAD_U64(ctx.r30.u32 + 0);
 	// ld r9,0(r11)
